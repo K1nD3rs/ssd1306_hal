@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "name": "STM32",
+      "defines": [
+        "STM32G030xx",
+        "USE_HAL_DRIVER"
+      ],
+      "includePath": [
+        "Core/Inc",
+        "Drivers/CMSIS/Device/ST/STM32G0xx/Include",
+        "Drivers/CMSIS/Include",
+        "Drivers/STM32G0xx_HAL_Driver/Inc",
+        "Drivers/STM32G0xx_HAL_Driver/Inc/Legacy"
+      ],
+      "C_Cpp.intelliSenseEngine": "disabled",
+      "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}"
+      ],
+      "compilerPath": "c:\\Users\\user\\AppData\\Roaming\\Code\\User\\globalStorage\\bmd.stm32-for-vscode\\@xpack-dev-tools\\arm-none-eabi-gcc\\15.2.1-1.1.1\\.content\\bin\\arm-none-eabi-gcc.EXE"
+    }
+  ]
+}
+
