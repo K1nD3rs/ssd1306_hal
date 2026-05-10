@@ -2,296 +2,300 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : SSD1306 UI + menu + encoder
+  * @brief          : SSD1306 UI DEMO
   ******************************************************************************
   */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
+
 #include "main.h"
+
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
 #include "ssd1306_conf.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
-
-/* Private define ------------------------------------------------------------*/
-#define MAX_SAMPLES    32
-#define ADC_MAX        4095UL
-
-#define SCREEN_METER   0
-#define SCREEN_BAR     1
-#define SCREEN_OSC     2
-#define SCREEN_MENU    3
-
-#define TOTAL_SCREENS  3
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 TIM_HandleTypeDef htim3;
 
-/* USER CODE BEGIN PV */
+/* ========================= */
+/* UI */
+/* ========================= */
 
-static uint16_t adc_value = 0;
+#define MENU_ITEMS 6
 
-static uint16_t waveform_buffer[MAX_SAMPLES];
-static uint8_t waveform_index = 0;
+static bool menu_mode = false;
 
-static uint8_t current_screen = 0;
+static uint8_t menu_selected = 0;
 
 static int16_t last_encoder = 0;
 
-static bool menu_mode = false;
-static uint8_t menu_selected = 0;
+static uint16_t fake_voltage = 0;
+static uint16_t fake_current = 0;
+static uint32_t fake_power   = 0;
 
-/* USER CODE END PV */
+static char* menu_list[MENU_ITEMS] =
+{
+    "Diagnostics",
+    "Power Monitor",
+    "Signal Analyzer",
+    "Sensor Matrix",
+    "System Status",
+    "Factory Reset"
+};
 
 /* Private function prototypes -----------------------------------------------*/
+
 void SystemClock_Config(void);
 
 static void MX_GPIO_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM3_Init(void);
 
-/* USER CODE BEGIN PFP */
+/* ========================= */
+/* RANDOM DATA */
+/* ========================= */
 
-static void draw_analog_meter(uint16_t value);
-static void draw_bar_graph(long long value);
-static void draw_waveform(void);
-
-static void add_to_waveform(uint16_t value);
-
-static void draw_menu(void);
-
-/* USER CODE END PFP */
-
-/* USER CODE BEGIN 0 */
-
-static void draw_menu(void)
+static void generate_fake_data(void)
 {
-    ssd1306_SetCursor(0, 0);
-    ssd1306_WriteString("=== MENU ===", Font_7x10, White);
+    fake_voltage =
+        2100 + (rand() % 400);
 
-    ssd1306_SetCursor(0, 18);
-    if (menu_selected == 0)
-    
-        ssd1306_WriteString(" >", Font_7x10, White);
-    else
-        ssd1306_WriteString("  ", Font_7x10, White);
-    
-    ssd1306_WriteString(" Meter", Font_7x10, White);
+    fake_current =
+        100 + (rand() % 900);
 
-    
-    ssd1306_SetCursor(0, 36);
-    if (menu_selected == 1)
-    
-        ssd1306_WriteString(" >", Font_7x10, White);
-    else
-        ssd1306_WriteString("  ", Font_7x10, White);
-
-    
-    ssd1306_WriteString(" Bar", Font_7x10, White);
-
-    
-    ssd1306_SetCursor(0, 56); 
-    if (menu_selected == 2)
-    
-        ssd1306_WriteString(" >", Font_7x10, White);
-    else
-        ssd1306_WriteString("  ", Font_7x10, White);
-
-    ssd1306_SetCursor(0, 74);   
-    ssd1306_WriteString(" Oscilloscope", Font_7x10, White);
-
-    
-    ssd1306_WriteString("Hold BTN + rotate", Font_7x10, White);
+    fake_power =
+        fake_voltage * fake_current;
 }
 
-/**
-  * @brief  Круглый стрелочный прибор
-  */
-static void draw_analog_meter(uint16_t value)
+/* ========================= */
+/* SIDE BARS */
+/* ========================= */
+
+static void draw_side_bars(void)
 {
-    const uint8_t cx = 64;
-    const uint8_t cy = 40;
-    const uint8_t r  = 30;
-
-    const float start_deg = 0;
-    const float end_deg   = 180.0f;
-
-    float angle =
-        start_deg +
-        (end_deg - start_deg) * (float)value / ADC_MAX;
-
-    ssd1306_DrawArc(
-        cx,
-        cy,
-        r,
-        (uint16_t)(start_deg + 90),
-        180,
-        White
-    );
-
-    for (int p = 0; p <= 100; p += 25)
+    for (uint8_t i = 0; i < 8; i++)
     {
-        float a =
-            start_deg +
-            (end_deg - start_deg) * p / 100.0f;
+        uint8_t h =
+            5 + (rand() % 24);
 
-        float rad = a * M_PI / 180.0f;
-
-        int x1 = cx + (int)((r - 3) * cosf(rad));
-        int y1 = cy + (int)((r - 3) * sinf(rad));
-
-        int x2 = cx + (int)(r * cosf(rad));
-        int y2 = cy + (int)(r * sinf(rad));
-
-        ssd1306_Line(x1, y1, x2, y2, White);
-    }
-
-    float rad_needle = angle * M_PI / 180.0f;
-
-    int16_t nx =
-        cx + (int)((r - 5) * cosf(rad_needle));
-
-    int16_t ny =
-        cy + (int)((r - 5) * sinf(rad_needle));
-
-    ssd1306_Line(cx, cy, nx, ny, White);
-
-    ssd1306_FillCircle(cx, cy, 3, White);
-
-    char buf[16];
-
-    sprintf(buf, "%4u", value);
-
-    ssd1306_SetCursor(54, 55);
-    ssd1306_WriteString(buf, Font_7x10, White);
-
-    ssd1306_SetCursor(94, 55);
-    ssd1306_WriteString("ADC", Font_7x10, White);
-}
-
-/**
-  * @brief  Горизонтальная гистограмма
-  */
-static void draw_bar_graph(long long value)
-{
-    uint8_t percent =
-        (value * 100) / ADC_MAX;
-
-    uint8_t bar_len =
-        (percent * 108) / 100;
-
-    ssd1306_DrawRectangle(
-        10,
-        20,
-        118,
-        38,
-        White
-    );
-
-    ssd1306_FillRectangle(
-        11,
-        21,
-        10 + bar_len,
-        37,
-        White
-    );
-
-    char buf[20];
-
-    sprintf(buf, "ADC: %ld", value);
-
-    ssd1306_SetCursor(10, 5);
-    ssd1306_WriteString(buf, Font_7x10, White);
-
-    sprintf(buf, "%d %%", percent);
-
-    ssd1306_SetCursor(10, 48);
-    ssd1306_WriteString(buf, Font_7x10, White);
-}
-
-/**
-  * @brief Добавление точки в буфер
-  */
-static void add_to_waveform(uint16_t value)
-{
-    if (waveform_index < MAX_SAMPLES)
-    {
-        waveform_buffer[waveform_index++] = value;
-    }
-    else
-    {
-        for (uint16_t i = 1; i < MAX_SAMPLES; i++)
-        {
-            waveform_buffer[i - 1] =
-                waveform_buffer[i];
-        }
-
-        waveform_buffer[MAX_SAMPLES - 1] =
-            value;
-    }
-}
-
-/**
-  * @brief Осциллограф
-  */
-static void draw_waveform(void)
-{
-    uint16_t n_points =
-        (waveform_index < MAX_SAMPLES)
-            ? waveform_index
-            : MAX_SAMPLES;
-
-    if (n_points < 2)
-        return;
-
-    int prev_x = 0;
-
-    int prev_y =
-        60 -
-        (waveform_buffer[0] * 56) / ADC_MAX;
-
-    for (uint16_t i = 1; i < n_points; i++)
-    {
-        int x =
-            i * 127 / (MAX_SAMPLES - 1);
-
-        int y =
-            60 -
-            (waveform_buffer[i] * 56) / ADC_MAX;
-
-        ssd1306_Line(
-            prev_x,
-            prev_y,
-            x,
-            y,
+        ssd1306_FillRectangle(
+            100 + (i * 3),
+            60 - h,
+            101 + (i * 3),
+            60,
             White
         );
-
-        prev_x = x;
-        prev_y = y;
     }
+}
 
-    ssd1306_SetCursor(0, 0);
+/* ========================= */
+/* MAIN DASHBOARD */
+/* ========================= */
 
-    char title[16];
+static void draw_dashboard(void)
+{
+    char buf[32];
 
-    sprintf(title, "OSC: %d", adc_value);
+    /* FRAME */
+
+    ssd1306_DrawRectangle(
+        0,
+        0,
+        127,
+        63,
+        White
+    );
+
+    /* HEADER */
+
+    ssd1306_SetCursor(24, 2);
 
     ssd1306_WriteString(
-        title,
+        "Volt-Amp Meter",
         Font_7x10,
         White
     );
+
+    ssd1306_Line(
+        0,
+        14,
+        127,
+        14,
+        White
+    );
+
+    /* BIG VOLTAGE */
+
+    sprintf(
+        buf,
+        "%2d.%01dV",
+        fake_voltage / 100,
+        (fake_voltage / 10) % 10
+    );
+
+    ssd1306_SetCursor(18, 18);
+
+    ssd1306_WriteString(
+        buf,
+        Font_11x18,
+        White
+    );
+
+    /* CURRENT */
+
+    sprintf(
+        buf,
+        "%2d.%01dA",
+        fake_current / 100,
+        (fake_current / 10) % 10
+    );
+
+    ssd1306_SetCursor(10, 44);
+
+    ssd1306_WriteString(
+        buf,
+        Font_7x10,
+        White
+    );
+
+    /* POWER */
+
+    sprintf(
+        buf,
+        "%luW",
+        fake_power / 100
+    );
+
+    ssd1306_SetCursor(10, 54);
+
+    ssd1306_WriteString(
+        buf,
+        Font_6x8,
+        White
+    );
+
+    /* STATUS */
+
+    ssd1306_SetCursor(94, 20);
+
+    ssd1306_WriteString(
+        "LIVE",
+        Font_6x8,
+        White
+    );
+
+    ssd1306_SetCursor(94, 32);
+
+    ssd1306_WriteString(
+        "SYS OK",
+        Font_6x8,
+        White
+    );
+
+    ssd1306_SetCursor(94, 44);
+
+    ssd1306_WriteString(
+        "I2C OK",
+        Font_6x8,
+        White
+    );
+
+    /* CIRCLE */
+
+    ssd1306_DrawCircle(
+        15,
+        28,
+        6,
+        White
+    );
+
+    ssd1306_FillCircle(
+        15,
+        28,
+        2,
+        White
+    );
+
+    /* SIDE BARS */
+
+    draw_side_bars();
 }
 
-/* USER CODE END 0 */
+/* ========================= */
+/* MENU */
+/* ========================= */
+
+static void draw_menu(void)
+{
+    ssd1306_DrawRectangle(
+        0,
+        0,
+        127,
+        63,
+        White
+    );
+
+    ssd1306_SetCursor(24, 2);
+
+    ssd1306_WriteString(
+        "CONTROL MENU",
+        Font_7x10,
+        White
+    );
+
+    ssd1306_Line(
+        0,
+        14,
+        127,
+        14,
+        White
+    );
+
+    for (uint8_t i = 0; i < MENU_ITEMS; i++)
+    {
+        uint8_t y = 18 + (i * 7);
+
+        if (i == menu_selected)
+        {
+            ssd1306_FillRectangle(
+                2,
+                y - 1,
+                124,
+                y + 6,
+                White
+            );
+
+            ssd1306_SetCursor(5, y);
+
+            ssd1306_WriteString(
+                menu_list[i],
+                Font_6x8,
+                Black
+            );
+        }
+        else
+        {
+            ssd1306_SetCursor(5, y);
+
+            ssd1306_WriteString(
+                menu_list[i],
+                Font_6x8,
+                White
+            );
+        }
+    }
+}
+
+/* ========================= */
+/* MAIN */
+/* ========================= */
 
 int main(void)
 {
@@ -300,15 +304,15 @@ int main(void)
     SystemClock_Config();
 
     MX_GPIO_Init();
-    MX_ADC1_Init();
     MX_I2C1_Init();
     MX_TIM3_Init();
 
-    HAL_Delay(1000);
+    HAL_Delay(100);
 
     ssd1306_Init();
 
     ssd1306_Fill(Black);
+
     ssd1306_UpdateScreen();
 
     HAL_TIM_Encoder_Start(
@@ -316,69 +320,48 @@ int main(void)
         TIM_CHANNEL_ALL
     );
 
-    __HAL_TIM_SET_COUNTER(&htim3, 0);
-
-    for (int i = 0; i < MAX_SAMPLES; i++)
-    {
-        waveform_buffer[i] = 0;
-    }
+    __HAL_TIM_SET_COUNTER(
+        &htim3,
+        0
+    );
 
     while (1)
     {
-        // =========================
-        // ADC
-        // =========================
+        /* ========================= */
+        /* BUTTON */
+        /* ========================= */
 
-        HAL_ADC_Start(&hadc1);
+        static bool old_button = false;
 
-        HAL_ADC_PollForConversion(
-            &hadc1,
-            10
-        );
-
-        adc_value =
-            HAL_ADC_GetValue(&hadc1);
-
-        HAL_ADC_Stop(&hadc1);
-
-        add_to_waveform(adc_value);
-
-        // =========================
-        // Encoder
-        // =========================
-
-        int32_t encoder_now =
-            __HAL_TIM_GET_COUNTER(&htim3);
-
-        // Кнопка нажата?
         bool button_pressed =
             (HAL_GPIO_ReadPin(
-                 GPIOA,
-                 GPIO_PIN_5
-             ) == GPIO_PIN_RESET);
+                GPIOA,
+                GPIO_PIN_5
+            ) == GPIO_PIN_RESET);
 
-        if (button_pressed)
+        if (button_pressed && !old_button)
         {
-            menu_mode = true;
-        }
-        else
-        {
-            if (menu_mode)
-            {
-                current_screen = menu_selected;
-            }
+            menu_mode = !menu_mode;
 
-            menu_mode = false;
+            HAL_Delay(150);
         }
 
-        // вращение энкодера
+        old_button = button_pressed;
+
+        /* ========================= */
+        /* ENCODER */
+        /* ========================= */
+
+        int16_t encoder_now =
+            __HAL_TIM_GET_COUNTER(&htim3);
+
         if (encoder_now != last_encoder)
         {
             if (menu_mode)
             {
                 if (encoder_now > last_encoder)
                 {
-                    if (menu_selected < (TOTAL_SCREENS - 1))
+                    if (menu_selected < (MENU_ITEMS - 1))
                     {
                         menu_selected++;
                     }
@@ -395,9 +378,15 @@ int main(void)
             last_encoder = encoder_now;
         }
 
-        // =========================
-        // DRAW
-        // =========================
+        /* ========================= */
+        /* DATA */
+        /* ========================= */
+
+        generate_fake_data();
+
+        /* ========================= */
+        /* DRAW */
+        /* ========================= */
 
         ssd1306_Fill(Black);
 
@@ -407,45 +396,12 @@ int main(void)
         }
         else
         {
-            switch (current_screen)
-            {
-                case SCREEN_METER:
-
-                    ssd1306_SetCursor(0, 0);
-                    ssd1306_WriteString(
-                        "METER",
-                        Font_7x10,
-                        White
-                    );
-
-                    draw_analog_meter(encoder_now*150);
-
-                    break;
-
-                case SCREEN_BAR:
-
-                    ssd1306_SetCursor(0, 0);
-                    ssd1306_WriteString(
-                        "BAR",
-                        Font_7x10,
-                        White
-                    );
-
-                    draw_bar_graph(encoder_now*50);
-
-                    break;
-
-                case SCREEN_OSC:
-
-                    draw_waveform();
-
-                    break;
-            }
+            draw_dashboard();
         }
 
         ssd1306_UpdateScreen();
 
-        HAL_Delay(20);
+        HAL_Delay(40);
     }
 }
 
@@ -455,155 +411,6 @@ int main(void)
 
 void SystemClock_Config(void)
 {
-    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-    HAL_PWREx_ControlVoltageScaling(
-        PWR_REGULATOR_VOLTAGE_SCALE1
-    );
-
-    RCC_OscInitStruct.OscillatorType =
-        RCC_OSCILLATORTYPE_HSI;
-
-    RCC_OscInitStruct.HSIState =
-        RCC_HSI_ON;
-
-    RCC_OscInitStruct.HSIDiv =
-        RCC_HSI_DIV1;
-
-    RCC_OscInitStruct.HSICalibrationValue =
-        RCC_HSICALIBRATION_DEFAULT;
-
-    RCC_OscInitStruct.PLL.PLLState =
-        RCC_PLL_ON;
-
-    RCC_OscInitStruct.PLL.PLLSource =
-        RCC_PLLSOURCE_HSI;
-
-    RCC_OscInitStruct.PLL.PLLM =
-        RCC_PLLM_DIV1;
-
-    RCC_OscInitStruct.PLL.PLLN = 8;
-
-    RCC_OscInitStruct.PLL.PLLP =
-        RCC_PLLP_DIV2;
-
-    RCC_OscInitStruct.PLL.PLLR =
-        RCC_PLLR_DIV2;
-
-    if (HAL_RCC_OscConfig(
-            &RCC_OscInitStruct
-        ) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    RCC_ClkInitStruct.ClockType =
-        RCC_CLOCKTYPE_HCLK |
-        RCC_CLOCKTYPE_SYSCLK |
-        RCC_CLOCKTYPE_PCLK1;
-
-    RCC_ClkInitStruct.SYSCLKSource =
-        RCC_SYSCLKSOURCE_PLLCLK;
-
-    RCC_ClkInitStruct.AHBCLKDivider =
-        RCC_SYSCLK_DIV1;
-
-    RCC_ClkInitStruct.APB1CLKDivider =
-        RCC_HCLK_DIV1;
-
-    if (HAL_RCC_ClockConfig(
-            &RCC_ClkInitStruct,
-            FLASH_LATENCY_2
-        ) != HAL_OK)
-    {
-        Error_Handler();
-    }
-}
-
-/* ========================= */
-/* ADC */
-/* ========================= */
-
-static void MX_ADC1_Init(void)
-{
-    ADC_ChannelConfTypeDef sConfig = {0};
-
-    hadc1.Instance = ADC1;
-
-    hadc1.Init.ClockPrescaler =
-        ADC_CLOCK_SYNC_PCLK_DIV2;
-
-    hadc1.Init.Resolution =
-        ADC_RESOLUTION_12B;
-
-    hadc1.Init.DataAlign =
-        ADC_DATAALIGN_RIGHT;
-
-    hadc1.Init.ScanConvMode =
-        ADC_SCAN_DISABLE;
-
-    hadc1.Init.EOCSelection =
-        ADC_EOC_SINGLE_CONV;
-
-    hadc1.Init.LowPowerAutoWait =
-        DISABLE;
-
-    hadc1.Init.LowPowerAutoPowerOff =
-        DISABLE;
-
-    hadc1.Init.ContinuousConvMode =
-        DISABLE;
-
-    hadc1.Init.NbrOfConversion = 1;
-
-    hadc1.Init.DiscontinuousConvMode =
-        DISABLE;
-
-    hadc1.Init.ExternalTrigConv =
-        ADC_SOFTWARE_START;
-
-    hadc1.Init.ExternalTrigConvEdge =
-        ADC_EXTERNALTRIGCONVEDGE_NONE;
-
-    hadc1.Init.DMAContinuousRequests =
-        DISABLE;
-
-    hadc1.Init.Overrun =
-        ADC_OVR_DATA_PRESERVED;
-
-    hadc1.Init.SamplingTimeCommon1 =
-        ADC_SAMPLETIME_1CYCLE_5;
-
-    hadc1.Init.SamplingTimeCommon2 =
-        ADC_SAMPLETIME_1CYCLE_5;
-
-    hadc1.Init.OversamplingMode =
-        DISABLE;
-
-    hadc1.Init.TriggerFrequencyMode =
-        ADC_TRIGGER_FREQ_HIGH;
-
-    if (HAL_ADC_Init(&hadc1) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    sConfig.Channel = ADC_CHANNEL_3;
-
-    sConfig.Rank =
-        ADC_REGULAR_RANK_1;
-
-    sConfig.SamplingTime =
-        ADC_SAMPLINGTIME_COMMON_1;
-
-    if (HAL_ADC_ConfigChannel(
-            &hadc1,
-            &sConfig
-        ) != HAL_OK)
-    {
-        Error_Handler();
-    }
 }
 
 /* ========================= */
@@ -635,10 +442,7 @@ static void MX_I2C1_Init(void)
     hi2c1.Init.NoStretchMode =
         I2C_NOSTRETCH_DISABLE;
 
-    if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-    {
-        Error_Handler();
-    }
+    HAL_I2C_Init(&hi2c1);
 
     HAL_I2CEx_ConfigAnalogFilter(
         &hi2c1,
@@ -652,12 +456,13 @@ static void MX_I2C1_Init(void)
 }
 
 /* ========================= */
-/* TIM3 ENCODER */
+/* TIM3 */
 /* ========================= */
 
 static void MX_TIM3_Init(void)
 {
     TIM_Encoder_InitTypeDef sConfig = {0};
+
     TIM_MasterConfigTypeDef sMasterConfig = {0};
 
     htim3.Instance = TIM3;
@@ -700,13 +505,10 @@ static void MX_TIM3_Init(void)
 
     sConfig.IC2Filter = 8;
 
-    if (HAL_TIM_Encoder_Init(
-            &htim3,
-            &sConfig
-        ) != HAL_OK)
-    {
-        Error_Handler();
-    }
+    HAL_TIM_Encoder_Init(
+        &htim3,
+        &sConfig
+    );
 
     sMasterConfig.MasterOutputTrigger =
         TIM_TRGO_RESET;
@@ -728,12 +530,13 @@ static void MX_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    // BUTTON
+    /* BUTTON */
 
-    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Pin =
+        GPIO_PIN_5;
 
     GPIO_InitStruct.Mode =
         GPIO_MODE_INPUT;
@@ -743,21 +546,6 @@ static void MX_GPIO_Init(void)
 
     HAL_GPIO_Init(
         GPIOA,
-        &GPIO_InitStruct
-    );
-
-    // ADC
-
-    GPIO_InitStruct.Pin = GPIO_PIN_3;
-
-    GPIO_InitStruct.Mode =
-        GPIO_MODE_ANALOG;
-
-    GPIO_InitStruct.Pull =
-        GPIO_NOPULL;
-
-    HAL_GPIO_Init(
-        GPIOB,
         &GPIO_InitStruct
     );
 }
@@ -774,14 +562,3 @@ void Error_Handler(void)
     {
     }
 }
-
-#ifdef USE_FULL_ASSERT
-
-void assert_failed(
-    uint8_t *file,
-    uint32_t line
-)
-{
-}
-
-#endif
