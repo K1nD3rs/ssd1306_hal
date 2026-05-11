@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /* Private variables ---------------------------------------------------------*/
 
@@ -28,17 +29,23 @@ TIM_HandleTypeDef htim3;
 /* UI */
 /* ========================= */
 
-#define MENU_ITEMS 6
+
+
 
 static bool menu_mode = false;
 
 static uint8_t menu_selected = 0;
+static uint8_t menu_scroll = 0;
+static uint8_t menuInfo_shift = 0;
+
 
 static int16_t last_encoder = 0;
 
 static uint16_t fake_voltage = 0;
 static uint16_t fake_current = 0;
 static uint32_t fake_power   = 0;
+
+#define MENU_ITEMS 32
 
 static char* menu_list[MENU_ITEMS] =
 {
@@ -47,7 +54,69 @@ static char* menu_list[MENU_ITEMS] =
     "Signal Analyzer",
     "Sensor Matrix",
     "System Status",
-    "Factory Reset"
+    "Factory Reset",
+    "ADC Monitor",
+    "GPIO Viewer",
+    "PWM Generator",
+    "UART Console",
+    "SPI Devices",
+    "I2C Scanner",
+    "CAN Bus",
+    "EEPROM Tool",
+    "RTC Clock",
+    "DAC Output",
+    "DMA Streams",
+    "Bootloader",
+    "Memory Viewer",
+    "CPU Load",
+    "Temperature",
+    "Fan Control",
+    "Voltage Rails",
+    "Spectrum View",
+    "Wave Generator",
+    "Logic Analyzer",
+    "Battery Health",
+    "Power Saving",
+    "Filesystem",
+    "Debug Terminal",
+    "Firmware Info",
+    "Developer Mode"
+};
+
+static char* menuInfo_list[MENU_ITEMS] =
+{
+    "Dima GAY",
+    "Live voltage monitor",
+    "FFT / waveform engine",
+    "I2C sensor network",
+    "Temperature / RAM / CPU",
+    "Reset all user settings",
+    "Raw ADC live values",
+    "GPIO pin state monitor",
+    "PWM frequency control",
+    "Serial communication",
+    "SPI peripheral manager",
+    "Search I2C addresses",
+    "CAN packet analyzer",
+    "EEPROM read/write tool",
+    "Realtime clock settings",
+    "Analog output generator",
+    "DMA transfer monitor",
+    "Firmware update utility",
+    "RAM / FLASH browser",
+    "CPU usage statistics",
+    "MCU thermal monitor",
+    "Cooling system control",
+    "Power line telemetry",
+    "Frequency spectrum mode",
+    "Signal waveform output",
+    "Digital signal capture",
+    "Battery diagnostics",
+    "Low power management",
+    "Internal file browser",
+    "Embedded debug shell",
+    "Firmware build details",
+    "Advanced engineering tools"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,6 +126,83 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM3_Init(void);
+
+
+
+static void draw_menu_info(void)
+{
+    static uint8_t menuSelected = 255;
+
+    static uint8_t offset = 0;
+    static uint8_t delay = 0;
+
+    static const char* text;
+    static char scrollBuf[128]; 
+    static uint16_t len;
+
+    /* ========================= */
+    /* смена пункта */
+    /* ========================= */
+
+    if (menuSelected != menu_selected)
+    {
+        menuSelected = menu_selected;
+
+        offset = 0;
+        delay = 0;
+
+        text = menuInfo_list[menu_selected];
+
+        /* формируем буфер ОДИН РАЗ */
+        snprintf(scrollBuf, sizeof(scrollBuf),
+            "%s   %s   ",
+            text, text);
+
+        len = strlen(scrollBuf);
+    }
+
+
+    
+    /* ========================= */
+    /* линия */
+    /* ========================= */
+
+    ssd1306_Line(0, 50, 127, 50, White);
+
+    /* ========================= */
+    /* задержка перед скроллом */
+    /* ========================= */
+
+    if (delay < 15)
+    {
+        delay++;
+    }
+    else
+    {
+        offset += 1;
+        if (offset >= len)
+            offset = 0;
+    }
+
+    /* ========================= */
+    /* ОКНО (видимая часть строки) */
+    /* ========================= */
+
+    ssd1306_SetCursor(4, 54);
+
+    /* ========================= */
+    /* РИСУЕМ ОКНО СКРОЛЛА */
+    /* ========================= */
+    for (uint8_t i = 0; i < 21; i++) // ~21 символ помещается
+    {
+        char c = scrollBuf[(offset + i) % len];
+        ssd1306_WriteChar(c, Font_6x8, White);
+    }
+    
+}
+
+
+
 
 /* ========================= */
 /* RANDOM DATA */
@@ -226,12 +372,24 @@ static void draw_dashboard(void)
     /* SIDE BARS */
 
     draw_side_bars();
+
+/* animated bottom line */
+
+for (uint8_t i = 0; i < 127; i += 4)
+{
+    uint8_t y =
+        63 -
+        ((i + HAL_GetTick() / 8) % 6);
+
+    ssd1306_DrawPixel(
+        i,
+        y,
+        White
+    );
 }
 
-/* ========================= */
-/* MENU */
-/* ========================= */
 
+}
 static void draw_menu(void)
 {
     ssd1306_DrawRectangle(
@@ -241,6 +399,8 @@ static void draw_menu(void)
         63,
         White
     );
+
+    /* HEADER */
 
     ssd1306_SetCursor(24, 2);
 
@@ -258,39 +418,114 @@ static void draw_menu(void)
         White
     );
 
-    for (uint8_t i = 0; i < MENU_ITEMS; i++)
-    {
-        uint8_t y = 18 + (i * 7);
+    /* ========================= */
+    /* SCROLL LOGIC */
+    /* ========================= */
 
-        if (i == menu_selected)
+    if (menu_selected < menu_scroll)
+    {
+        menu_scroll = menu_selected;
+    }
+
+    if (menu_selected >= (menu_scroll + 4))
+    {
+        menu_scroll =
+            menu_selected - 3;
+    }
+
+    /* ========================= */
+    /* DRAW VISIBLE ITEMS */
+    /* ========================= */
+
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        uint8_t item_index =
+            menu_scroll + i;
+
+        if (item_index >= MENU_ITEMS)
+            break;
+
+        uint8_t y =
+            18 + (i * 8);
+
+        /* SELECTED */
+
+        if (item_index == menu_selected)
         {
             ssd1306_FillRectangle(
                 2,
                 y - 1,
-                124,
-                y + 6,
+                118,
+                y + 7,
                 White
             );
 
-            ssd1306_SetCursor(5, y);
+            ssd1306_FillCircle(
+                7,
+                y +3,
+                1,
+                Black
+            );
+
+            ssd1306_SetCursor(
+                12,
+                y
+            );
 
             ssd1306_WriteString(
-                menu_list[i],
+                menu_list[item_index],
                 Font_6x8,
                 Black
             );
         }
         else
         {
-            ssd1306_SetCursor(5, y);
+            ssd1306_SetCursor(
+                12,
+                y
+            );
 
             ssd1306_WriteString(
-                menu_list[i],
+                menu_list[item_index],
                 Font_6x8,
                 White
             );
         }
     }
+
+    /* ========================= */
+    /* SCROLLBAR */
+    /* ========================= */
+
+    ssd1306_DrawRectangle(
+        121,
+        18,
+        125,
+        48,
+        White
+    );
+
+    uint8_t scroll_h =
+        8;
+
+    uint8_t scroll_y =
+        19 +
+        ((20 * menu_selected)
+        / (MENU_ITEMS - 1));
+
+    ssd1306_FillRectangle(
+        122,
+        scroll_y,
+        124,
+        scroll_y + scroll_h,
+        White
+    );
+
+    /* ========================= */
+    /* INFO */
+    /* ========================= */
+
+    draw_menu_info();
 }
 
 /* ========================= */
@@ -492,7 +727,7 @@ static void MX_TIM3_Init(void)
     sConfig.IC1Prescaler =
         TIM_ICPSC_DIV1;
 
-    sConfig.IC1Filter = 8;
+    sConfig.IC1Filter = 10;
 
     sConfig.IC2Polarity =
         TIM_ICPOLARITY_RISING;
@@ -503,7 +738,7 @@ static void MX_TIM3_Init(void)
     sConfig.IC2Prescaler =
         TIM_ICPSC_DIV1;
 
-    sConfig.IC2Filter = 8;
+    sConfig.IC2Filter = 10;
 
     HAL_TIM_Encoder_Init(
         &htim3,
