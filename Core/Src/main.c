@@ -1,10 +1,10 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : SSD1306 UI DEMO
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : SSD1306 UI DEMO
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -14,6 +14,8 @@
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
 #include "ssd1306_conf.h"
+
+#include "../uiLib/uiLib.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -29,95 +31,276 @@ TIM_HandleTypeDef htim3;
 /* UI */
 /* ========================= */
 
-
-
-
-static bool menu_mode = false;
-
-static uint8_t menu_selected = 0;
-static uint8_t menu_scroll = 0;
-static uint8_t menuInfo_shift = 0;
-
-
 static int16_t last_encoder = 0;
 
-static uint16_t fake_voltage = 0;
-static uint16_t fake_current = 0;
-static uint32_t fake_power   = 0;
+/* ===================================================== */
+/* ACTIONS */
+/* ===================================================== */
 
-#define MENU_ITEMS 32
+void set_volume(void) {};
+void toggle_mute(void) {};
+void show_info(void) {};
+void adc_monitor(void) {};
+void gpio_viewer(void) {};
+void pwm_generator(void) {};
+void uart_console(void) {};
+void spi_devices(void) {};
+void i2c_scanner(void) {};
+void can_bus(void) {};
+void rtc_clock(void) {};
+void battery_health(void) {};
+void developer_mode(void) {};
+void factory_reset(void) {};
 
-static char* menu_list[MENU_ITEMS] =
-{
-    "Diagnostics",
-    "Power Monitor",
-    "Signal Analyzer",
-    "Sensor Matrix",
-    "System Status",
-    "Factory Reset",
-    "ADC Monitor",
-    "GPIO Viewer",
-    "PWM Generator",
-    "UART Console",
-    "SPI Devices",
-    "I2C Scanner",
-    "CAN Bus",
-    "EEPROM Tool",
-    "RTC Clock",
-    "DAC Output",
-    "DMA Streams",
-    "Bootloader",
-    "Memory Viewer",
-    "CPU Load",
-    "Temperature",
-    "Fan Control",
-    "Voltage Rails",
-    "Spectrum View",
-    "Wave Generator",
-    "Logic Analyzer",
-    "Battery Health",
-    "Power Saving",
-    "Filesystem",
-    "Debug Terminal",
-    "Firmware Info",
-    "Developer Mode"
-};
+/* ===================================================== */
+/* DEBUG MENU */
+/* ===================================================== */
 
-static char* menuInfo_list[MENU_ITEMS] =
-{
-    "Dima GAY",
-    "Live voltage monitor",
-    "FFT / waveform engine",
-    "I2C sensor network",
-    "Temperature / RAM / CPU",
-    "Reset all user settings",
-    "Raw ADC live values",
-    "GPIO pin state monitor",
-    "PWM frequency control",
-    "Serial communication",
-    "SPI peripheral manager",
-    "Search I2C addresses",
-    "CAN packet analyzer",
-    "EEPROM read/write tool",
-    "Realtime clock settings",
-    "Analog output generator",
-    "DMA transfer monitor",
-    "Firmware update utility",
-    "RAM / FLASH browser",
-    "CPU usage statistics",
-    "MCU thermal monitor",
-    "Cooling system control",
-    "Power line telemetry",
-    "Frequency spectrum mode",
-    "Signal waveform output",
-    "Digital signal capture",
-    "Battery diagnostics",
-    "Low power management",
-    "Internal file browser",
-    "Embedded debug shell",
-    "Firmware build details",
-    "Advanced engineering tools"
-};
+MenuItem_t debugMenu[] =
+    {
+        {"UART Console",
+         "Serial communication",
+         NULL,
+         NULL,
+         0,
+         uart_console},
+
+        {"GPIO Viewer",
+         "GPIO pin state monitor",
+         NULL,
+         NULL,
+         0,
+         gpio_viewer},
+
+        {"ADC Monitor",
+         "Raw ADC live values",
+         NULL,
+         NULL,
+         0,
+         adc_monitor},
+
+        {"Developer Mode",
+         "Advanced engineering tools",
+         NULL,
+         NULL,
+         0,
+         developer_mode}};
+
+/* ===================================================== */
+/* POWER MENU */
+/* ===================================================== */
+
+MenuItem_t powerMenu[] =
+    {
+        {"Battery Health",
+         "Battery diagnostics",
+         NULL,
+         NULL,
+         0,
+         battery_health},
+
+        {"Power Saving",
+         "Low power management",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"Voltage Rails",
+         "Power line telemetry",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"Fan Control",
+         "Cooling system control",
+         NULL,
+         NULL,
+         0,
+         NULL}};
+
+/* ===================================================== */
+/* INTERFACES MENU */
+/* ===================================================== */
+
+MenuItem_t interfacesMenu[] =
+    {
+        {"UART Console",
+         "Serial communication",
+         NULL,
+         NULL,
+         0,
+         uart_console},
+
+        {"SPI Devices",
+         "SPI peripheral manager",
+         NULL,
+         NULL,
+         0,
+         spi_devices},
+
+        {"I2C Scanner",
+         "Search I2C addresses",
+         NULL,
+         NULL,
+         0,
+         i2c_scanner},
+
+        {"CAN Bus",
+         "CAN packet analyzer",
+         NULL,
+         NULL,
+         0,
+         can_bus}};
+
+/* ===================================================== */
+/* SOUND MENU */
+/* ===================================================== */
+
+MenuItem_t soundMenu[] =
+    {
+        {"Volume",
+         "Set volume",
+         NULL,
+         NULL,
+         0,
+         set_volume},
+
+        {"Mute",
+         "Toggle mute",
+         NULL,
+         NULL,
+         0,
+         toggle_mute}};
+
+/* ===================================================== */
+/* SYSTEM MENU */
+/* ===================================================== */
+
+MenuItem_t systemMenu[] =
+    {
+        {"System Status",
+         "Temperature / RAM / CPU",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"Firmware Info",
+         "Firmware build details",
+         NULL,
+         NULL,
+         0,
+         show_info},
+
+        {"RTC Clock",
+         "Realtime clock settings",
+         NULL,
+         NULL,
+         0,
+         rtc_clock},
+
+        {"Factory Reset",
+         "Reset all user settings",
+         NULL,
+         NULL,
+         0,
+         factory_reset}};
+
+/* ===================================================== */
+/* TOOLS MENU */
+/* ===================================================== */
+
+MenuItem_t toolsMenu[] =
+    {
+        {"Signal Analyzer",
+         "FFT / waveform engine",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"Logic Analyzer",
+         "Digital signal capture",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"Wave Generator",
+         "Signal waveform output",
+         NULL,
+         NULL,
+         0,
+         NULL},
+
+        {"PWM Generator",
+         "PWM frequency control",
+         NULL,
+         NULL,
+         0,
+         pwm_generator}};
+
+/* ===================================================== */
+/* MAIN MENU */
+/* ===================================================== */
+
+MenuItem_t mainMenu[] =
+    {
+        {"Sound",
+         "Audio settings",
+         NULL,
+         soundMenu,
+         sizeof(soundMenu) / sizeof(MenuItem_t),
+         NULL},
+
+        {"System",
+         "System tools and info",
+         NULL,
+         systemMenu,
+         sizeof(systemMenu) / sizeof(MenuItem_t),
+         NULL},
+
+        {"Power",
+         "Power management",
+         NULL,
+         powerMenu,
+         sizeof(powerMenu) / sizeof(MenuItem_t),
+         NULL},
+
+        {"Interfaces",
+         "Communication peripherals",
+         NULL,
+         interfacesMenu,
+         sizeof(interfacesMenu) / sizeof(MenuItem_t),
+         NULL},
+
+        {"Tools",
+         "Signal processing utilities",
+         NULL,
+         toolsMenu,
+         sizeof(toolsMenu) / sizeof(MenuItem_t),
+         NULL},
+
+        {"Debug",
+         "Low level debug functions",
+         NULL,
+         debugMenu,
+         sizeof(debugMenu) / sizeof(MenuItem_t),
+         NULL}};
+
+uint8_t Button_Handler(void);
+
+/* MenuItem_t soundMenu[] =
+    {
+        {"Volume", "Set volume", NULL, NULL, 0, set_volume},
+        {"Mute", "Toggle mute", NULL, NULL, 0, toggle_mute}};
+
+MenuItem_t mainMenu[] =
+    {
+        {"Sound", "Audio settings", NULL, soundMenu, 2, NULL},
+        {"Info", "System info", NULL, NULL, 0, show_info}}; */
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -126,407 +309,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM3_Init(void);
-
-
-
-static void draw_menu_info(void)
-{
-    static uint8_t menuSelected = 255;
-
-    static uint8_t offset = 0;
-    static uint8_t delay = 0;
-
-    static const char* text;
-    static char scrollBuf[128]; 
-    static uint16_t len;
-
-    /* ========================= */
-    /* смена пункта */
-    /* ========================= */
-
-    if (menuSelected != menu_selected)
-    {
-        menuSelected = menu_selected;
-
-        offset = 0;
-        delay = 0;
-
-        text = menuInfo_list[menu_selected];
-
-        /* формируем буфер ОДИН РАЗ */
-        snprintf(scrollBuf, sizeof(scrollBuf),
-            "%s   %s   ",
-            text, text);
-
-        len = strlen(scrollBuf);
-    }
-
-
-    
-    /* ========================= */
-    /* линия */
-    /* ========================= */
-
-    ssd1306_Line(0, 50, 127, 50, White);
-
-    /* ========================= */
-    /* задержка перед скроллом */
-    /* ========================= */
-
-    if (delay < 15)
-    {
-        delay++;
-    }
-    else
-    {
-        offset += 1;
-        if (offset >= len)
-            offset = 0;
-    }
-
-    /* ========================= */
-    /* ОКНО (видимая часть строки) */
-    /* ========================= */
-
-    ssd1306_SetCursor(4, 54);
-
-    /* ========================= */
-    /* РИСУЕМ ОКНО СКРОЛЛА */
-    /* ========================= */
-    for (uint8_t i = 0; i < 21; i++) // ~21 символ помещается
-    {
-        char c = scrollBuf[(offset + i) % len];
-        ssd1306_WriteChar(c, Font_6x8, White);
-    }
-    
-}
-
-
-
-
-/* ========================= */
-/* RANDOM DATA */
-/* ========================= */
-
-static void generate_fake_data(void)
-{
-    fake_voltage =
-        2100 + (rand() % 400);
-
-    fake_current =
-        100 + (rand() % 900);
-
-    fake_power =
-        fake_voltage * fake_current;
-}
-
-/* ========================= */
-/* SIDE BARS */
-/* ========================= */
-
-static void draw_side_bars(void)
-{
-    for (uint8_t i = 0; i < 8; i++)
-    {
-        uint8_t h =
-            5 + (rand() % 24);
-
-        ssd1306_FillRectangle(
-            100 + (i * 3),
-            60 - h,
-            101 + (i * 3),
-            60,
-            White
-        );
-    }
-}
-
-/* ========================= */
-/* MAIN DASHBOARD */
-/* ========================= */
-
-static void draw_dashboard(void)
-{
-    char buf[32];
-
-    /* FRAME */
-
-    ssd1306_DrawRectangle(
-        0,
-        0,
-        127,
-        63,
-        White
-    );
-
-    /* HEADER */
-
-    ssd1306_SetCursor(24, 2);
-
-    ssd1306_WriteString(
-        "Volt-Amp Meter",
-        Font_7x10,
-        White
-    );
-
-    ssd1306_Line(
-        0,
-        14,
-        127,
-        14,
-        White
-    );
-
-    /* BIG VOLTAGE */
-
-    sprintf(
-        buf,
-        "%2d.%01dV",
-        fake_voltage / 100,
-        (fake_voltage / 10) % 10
-    );
-
-    ssd1306_SetCursor(18, 18);
-
-    ssd1306_WriteString(
-        buf,
-        Font_11x18,
-        White
-    );
-
-    /* CURRENT */
-
-    sprintf(
-        buf,
-        "%2d.%01dA",
-        fake_current / 100,
-        (fake_current / 10) % 10
-    );
-
-    ssd1306_SetCursor(10, 44);
-
-    ssd1306_WriteString(
-        buf,
-        Font_7x10,
-        White
-    );
-
-    /* POWER */
-
-    sprintf(
-        buf,
-        "%luW",
-        fake_power / 100
-    );
-
-    ssd1306_SetCursor(10, 54);
-
-    ssd1306_WriteString(
-        buf,
-        Font_6x8,
-        White
-    );
-
-    /* STATUS */
-
-    ssd1306_SetCursor(94, 20);
-
-    ssd1306_WriteString(
-        "LIVE",
-        Font_6x8,
-        White
-    );
-
-    ssd1306_SetCursor(94, 32);
-
-    ssd1306_WriteString(
-        "SYS OK",
-        Font_6x8,
-        White
-    );
-
-    ssd1306_SetCursor(94, 44);
-
-    ssd1306_WriteString(
-        "I2C OK",
-        Font_6x8,
-        White
-    );
-
-    /* CIRCLE */
-
-    ssd1306_DrawCircle(
-        15,
-        28,
-        6,
-        White
-    );
-
-    ssd1306_FillCircle(
-        15,
-        28,
-        2,
-        White
-    );
-
-    /* SIDE BARS */
-
-    draw_side_bars();
-
-/* animated bottom line */
-
-for (uint8_t i = 0; i < 127; i += 4)
-{
-    uint8_t y =
-        63 -
-        ((i + HAL_GetTick() / 8) % 6);
-
-    ssd1306_DrawPixel(
-        i,
-        y,
-        White
-    );
-}
-
-
-}
-static void draw_menu(void)
-{
-    ssd1306_DrawRectangle(
-        0,
-        0,
-        127,
-        63,
-        White
-    );
-
-    /* HEADER */
-
-    ssd1306_SetCursor(24, 2);
-
-    ssd1306_WriteString(
-        "CONTROL MENU",
-        Font_7x10,
-        White
-    );
-
-    ssd1306_Line(
-        0,
-        14,
-        127,
-        14,
-        White
-    );
-
-    /* ========================= */
-    /* SCROLL LOGIC */
-    /* ========================= */
-
-    if (menu_selected < menu_scroll)
-    {
-        menu_scroll = menu_selected;
-    }
-
-    if (menu_selected >= (menu_scroll + 4))
-    {
-        menu_scroll =
-            menu_selected - 3;
-    }
-
-    /* ========================= */
-    /* DRAW VISIBLE ITEMS */
-    /* ========================= */
-
-    for (uint8_t i = 0; i < 4; i++)
-    {
-        uint8_t item_index =
-            menu_scroll + i;
-
-        if (item_index >= MENU_ITEMS)
-            break;
-
-        uint8_t y =
-            18 + (i * 8);
-
-        /* SELECTED */
-
-        if (item_index == menu_selected)
-        {
-            ssd1306_FillRectangle(
-                2,
-                y - 1,
-                118,
-                y + 7,
-                White
-            );
-
-            ssd1306_FillCircle(
-                7,
-                y +3,
-                1,
-                Black
-            );
-
-            ssd1306_SetCursor(
-                12,
-                y
-            );
-
-            ssd1306_WriteString(
-                menu_list[item_index],
-                Font_6x8,
-                Black
-            );
-        }
-        else
-        {
-            ssd1306_SetCursor(
-                12,
-                y
-            );
-
-            ssd1306_WriteString(
-                menu_list[item_index],
-                Font_6x8,
-                White
-            );
-        }
-    }
-
-    /* ========================= */
-    /* SCROLLBAR */
-    /* ========================= */
-
-    ssd1306_DrawRectangle(
-        121,
-        18,
-        125,
-        48,
-        White
-    );
-
-    uint8_t scroll_h =
-        8;
-
-    uint8_t scroll_y =
-        19 +
-        ((20 * menu_selected)
-        / (MENU_ITEMS - 1));
-
-    ssd1306_FillRectangle(
-        122,
-        scroll_y,
-        124,
-        scroll_y + scroll_h,
-        White
-    );
-
-    /* ========================= */
-    /* INFO */
-    /* ========================= */
-
-    draw_menu_info();
-}
 
 /* ========================= */
 /* MAIN */
@@ -552,36 +334,45 @@ int main(void)
 
     HAL_TIM_Encoder_Start(
         &htim3,
-        TIM_CHANNEL_ALL
-    );
+        TIM_CHANNEL_ALL);
 
     __HAL_TIM_SET_COUNTER(
         &htim3,
-        0
-    );
+        0);
+
+    uiLib_init(mainMenu, 6);
 
     while (1)
     {
-        /* ========================= */
-        /* BUTTON */
-        /* ========================= */
 
-        static bool old_button = false;
-
-        bool button_pressed =
-            (HAL_GPIO_ReadPin(
-                GPIOA,
-                GPIO_PIN_5
-            ) == GPIO_PIN_RESET);
-
-        if (button_pressed && !old_button)
+        switch (Button_Handler())
         {
-            menu_mode = !menu_mode;
+        case 1:
+            MenuItem_t *current =
+                &ui.items[ui.selected];
 
-            HAL_Delay(150);
+            // если есть подменю
+            if (current->children != NULL)
+            {
+                ui.stack[ui.stackDepth++] = ui.items;
+
+                ui.items = current->children;
+                ui.itemsCount = current->childrenCount;
+
+                ui.selected = 0;
+                ui.scroll = 0;
+            }
+            break;
+
+        case 2:
+            if (ui.stackDepth > 0)
+            {
+                ui.items = ui.stack[--ui.stackDepth];
+                // ui.itemsCount = ui.items->childrenCount;
+            }
+
+            break;
         }
-
-        old_button = button_pressed;
 
         /* ========================= */
         /* ENCODER */
@@ -592,21 +383,19 @@ int main(void)
 
         if (encoder_now != last_encoder)
         {
-            if (menu_mode)
+
+            if (encoder_now > last_encoder)
             {
-                if (encoder_now > last_encoder)
+                if (ui.selected < (MENU_ITEMS - 1))
                 {
-                    if (menu_selected < (MENU_ITEMS - 1))
-                    {
-                        menu_selected++;
-                    }
+                    ui.selected++;
                 }
-                else
+            }
+            else
+            {
+                if (ui.selected > 0)
                 {
-                    if (menu_selected > 0)
-                    {
-                        menu_selected--;
-                    }
+                    ui.selected--;
                 }
             }
 
@@ -614,29 +403,12 @@ int main(void)
         }
 
         /* ========================= */
-        /* DATA */
-        /* ========================= */
-
-        generate_fake_data();
-
-        /* ========================= */
         /* DRAW */
         /* ========================= */
 
-        ssd1306_Fill(Black);
-
-        if (menu_mode)
-        {
-            draw_menu();
-        }
-        else
-        {
-            draw_dashboard();
-        }
-
-        ssd1306_UpdateScreen();
-
-        HAL_Delay(40);
+        uiLib_renderMenu();
+        ssd1306_UpdateScreen(); // ! Отрисовка буффера
+        HAL_Delay(5);
     }
 }
 
@@ -681,13 +453,11 @@ static void MX_I2C1_Init(void)
 
     HAL_I2CEx_ConfigAnalogFilter(
         &hi2c1,
-        I2C_ANALOGFILTER_ENABLE
-    );
+        I2C_ANALOGFILTER_ENABLE);
 
     HAL_I2CEx_ConfigDigitalFilter(
         &hi2c1,
-        0
-    );
+        0);
 }
 
 /* ========================= */
@@ -742,8 +512,7 @@ static void MX_TIM3_Init(void)
 
     HAL_TIM_Encoder_Init(
         &htim3,
-        &sConfig
-    );
+        &sConfig);
 
     sMasterConfig.MasterOutputTrigger =
         TIM_TRGO_RESET;
@@ -753,8 +522,7 @@ static void MX_TIM3_Init(void)
 
     HAL_TIMEx_MasterConfigSynchronization(
         &htim3,
-        &sMasterConfig
-    );
+        &sMasterConfig);
 }
 
 /* ========================= */
@@ -781,8 +549,46 @@ static void MX_GPIO_Init(void)
 
     HAL_GPIO_Init(
         GPIOA,
-        &GPIO_InitStruct
-    );
+        &GPIO_InitStruct);
+}
+
+/* ========================= */
+/* BUTTON_HANDLER */
+/* ========================= */
+
+uint8_t Button_Handler(void)
+{
+    static uint32_t lastClick = 0;
+    static uint8_t clickCount = 0;
+
+    if (!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5))
+    {
+        HAL_Delay(20); // антидребезг
+
+        if (!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5))
+        {
+            while (!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5))
+                ;
+
+            clickCount++;
+
+            if (HAL_GetTick() - lastClick > 300)
+            {
+                clickCount = 1;
+            }
+
+            lastClick = HAL_GetTick();
+        }
+    }
+
+    if (clickCount > 0 && (HAL_GetTick() - lastClick) > 300)
+    {
+        uint8_t result = clickCount;
+        clickCount = 0;
+        return result;
+    }
+
+    return 255; // ничего
 }
 
 /* ========================= */

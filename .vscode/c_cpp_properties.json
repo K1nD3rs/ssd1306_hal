@@ -13,12 +13,12 @@
         "Drivers/STM32G0xx_HAL_Driver/Inc",
         "Drivers/STM32G0xx_HAL_Driver/Inc/Legacy"
       ],
-      "C_Cpp.intelliSenseEngine": "disabled",
       "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}"
       ],
-      "compilerPath": "c:\\Users\\user\\AppData\\Roaming\\Code\\User\\globalStorage\\bmd.stm32-for-vscode\\@xpack-dev-tools\\arm-none-eabi-gcc\\15.2.1-1.1.1\\.content\\bin\\arm-none-eabi-gcc.EXE"
+      "compilerPath": "c:\\Users\\user\\AppData\\Roaming\\Code\\User\\globalStorage\\bmd.stm32-for-vscode\\@xpack-dev-tools\\arm-none-eabi-gcc\\15.2.1-1.1.1\\.content\\bin\\arm-none-eabi-gcc.EXE",
+      "intelliSenseMode": "windows-msvc-x64"
     }
-  ]
+  ],
+  "version": 4
 }
-

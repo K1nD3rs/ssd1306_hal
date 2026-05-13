@@ -83,6 +83,7 @@ Core/Src/stm32g0xx_it.c \
 Core/Src/syscalls.c \
 Core/Src/sysmem.c \
 Core/Src/system_stm32g0xx.c \
+Core/uiLib/uiLib.c \
 Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal.c \
 Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_adc.c \
 Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_adc_ex.c \
